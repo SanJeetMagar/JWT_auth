@@ -18,10 +18,10 @@ class ForgotPasswordSerializer(serializers.Serializer):
     def validate_email(self,value):
         if not CustomUser.objects.filter(email =value).exists():
             raise serializers.ValidationError("No user found")
- 
+        return value
 class ChangePasswordSerializer(serializers.Serializer):
-    # old_password = serializers.CharField(write_only = True) 
-    # new_password = serializers.CharField(write_only = True, min_length = 6)
+    old_password = serializers.CharField(write_only = True)
+    new_password = serializers.CharField(write_only = True)
     def validate(self,data):
         old_password = data.get("old_password")
         new_password = data.get("new_password")
