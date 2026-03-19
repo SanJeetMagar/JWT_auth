@@ -30,14 +30,12 @@ class RegisterView(APIView):
         return Response({"message": "invalid data"}, status= status.HTTP_400_BAD_REQUEST)
 @extend_schema(tags=["Authentication"])  
 class LoginView(APIView):
-
     def post(self, request):
-        email = request.data.get('email')
-        password = request.data.get('password')
-        user = authenticate(request, username=email, password=password)
-        if user is None:
-            return Response({"message": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
-)
+        # email = request.data.get('email')
+        # password = request.data.get('password')
+        # user = authenticate(request, username=email, password=password)
+        # if user is None:
+        #     return Response({"message": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         refresh = RefreshToken.for_user(user)
         return Response({
             'access': str(refresh.access_token),
@@ -69,7 +67,7 @@ class ForgotPasswordView(APIView):
             user.password_reset_expiry = timezone.now() + timedelta(hours=1)
             user.save()
             send_password_reset_email(user)
-            return Response ({"message":"Password Change link sended"}, status=status.HTTP_200_OK)
+            return Response ({"message":"Password reset link sent"}, status=status.HTTP_200_OK)
         except CustomUser.DoesNotExist:
             return Response({"message": "email not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -100,7 +98,7 @@ class ChangePasswordView(APIView):
         request.user.save()
         return Response({"message": "password changed"}, status=status.HTTP_200_OK)
         
-        
+
 
             
 
