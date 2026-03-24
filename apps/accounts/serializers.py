@@ -1,4 +1,4 @@
-from .models import CustomUser
+from .models import CustomUser, Profile
 from rest_framework import serializers
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -30,3 +30,8 @@ class ChangePasswordSerializer(serializers.Serializer):
         return data
 class ResetPasswordsSerializer(serializers.Serializer):
     password = serializers.CharField(write_only = True)
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        exclude = ['id', 'user']
