@@ -32,6 +32,14 @@ class ResetPasswordsSerializer(serializers.Serializer):
     password = serializers.CharField(write_only = True)
 
 class ProfileSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.SerializerMethodField()
+
     class Meta:
         model = Profile
         exclude = ['id', 'user']
+
+    def get_profile_picture(self, obj):
+        request = self.context.get('request')
+        if obj.profile_picture:
+            return request.build_absolute_uri(obj.profile_picture.url)
+        return None
