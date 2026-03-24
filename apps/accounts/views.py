@@ -115,7 +115,9 @@ class ChangePasswordView(APIView):
             request.user.save()
             return Response({"message": "password changed"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)       
+@extend_schema(tags=["Profile"],request=ProfileSerializer)
 class ProfileView(APIView):
+    serializer_class = ProfileSerializer
     permission_classes = [IsAuthenticated]
     def get(self, request):
         profile = Profile.objects.get(user = request.user)
