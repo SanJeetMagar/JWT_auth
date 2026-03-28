@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .serializers import RegisterSerializer, LoginSerializer,ForgotPasswordSerializer,ResetPasswordsSerializer, ChangePasswordSerializer,ProfileSerializer
 from .emails import send_verification_email, send_password_reset_email
@@ -131,7 +132,15 @@ class ProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-
-            
-
+@extend_schema(tags=["Authentication"])  
+class LogOutView(APIView):
+    serializer_class = None
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        try:
+            refresh_token_string = request.data.get('refresh')
+            token = RefreshToken(refresh_token_string)
+            token.blacklist()  # ← blacklists it!
+            return Response({"message": "Logged out successfully"})
+        except Exception as e:
+            return Response({"message": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
