@@ -5,10 +5,11 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
-from .serializers import RegisterSerializer, LoginSerializer,ForgotPasswordSerializer,ResetPasswordsSerializer, ChangePasswordSerializer
+from .serializers import RegisterSerializer, LoginSerializer,ForgotPasswordSerializer,ResetPasswordsSerializer, ChangePasswordSerializer,ProfileSerializer
 from .emails import send_verification_email, send_password_reset_email
-from .models import CustomUser
+from .models import CustomUser, Profile
 from drf_spectacular.utils import extend_schema
 from django.utils import timezone
 from datetime import timedelta
@@ -40,6 +41,8 @@ class LoginView(APIView):
             user = authenticate(request, username=email, password=password)
             if user is None:
                 return Response({"message": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            if not user.is_verified:
+                return Response({"message": "Please verify your email first"}, status=status.HTTP_403_FORBIDDEN)
             refresh = RefreshToken.for_user(user)
             return Response({
                 'access': str(refresh.access_token),
@@ -112,13 +115,32 @@ class ChangePasswordView(APIView):
             request.user.set_password(new_password)
             request.user.save()
             return Response({"message": "password changed"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)       
+@extend_schema(tags=["Profile"],request=ProfileSerializer)
+class ProfileView(APIView):
+    serializer_class = ProfileSerializer
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        profile = Profile.objects.get(user = request.user)
+        serializer = ProfileSerializer(profile, context={'request': request})
+        return Response(serializer.data,status=status.HTTP_200_OK)
+    def patch(self, request):
+        profile = Profile.objects.get(user=request.user)
+        serializer = ProfileSerializer(profile, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        
-        
 
-        
-
-
-            
-
+@extend_schema(tags=["Authentication"])  
+class LogOutView(APIView):
+    serializer_class = None
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        try:
+            refresh_token_string = request.data.get('refresh')
+            token = RefreshToken(refresh_token_string)
+            token.blacklist()  # ← blacklists it!
+            return Response({"message": "Logged out successfully"})
+        except Exception as e:
+            return Response({"message": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
