@@ -7,13 +7,18 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
-from .serializers import RegisterSerializer, LoginSerializer,ForgotPasswordSerializer,ResetPasswordsSerializer, ChangePasswordSerializer,ProfileSerializer
-from .emails import send_verification_email, send_password_reset_email
+from .serializers import RegisterSerializer, LoginSerializer,ForgotPasswordSerializer,ResetPasswordsSerializer, ChangePasswordSerializer,ProfileSerializer, UserProfileSerializer, LoginOTPVerifySerializer
+from .emails import send_verification_email, send_password_reset_email, send_otp_email
 from .models import CustomUser, Profile
 from drf_spectacular.utils import extend_schema
 from django.utils import timezone
 from datetime import timedelta
 import uuid
+import random
+import string
+from django.utils import timezone
+from datetime import timedelta
+from django.shortcuts import get_object_or_404
 
 @extend_schema(
     summary="Register new user",
@@ -29,25 +34,27 @@ class RegisterView(APIView):
             user = serializer.save()
             send_verification_email(user)
             return Response({'message': 'created successfully'}, status=status.HTTP_201_CREATED)
-        return Response({"message": "invalid data"}, status= status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 @extend_schema(tags=["Authentication"],    request=LoginSerializer,)  
 class LoginView(APIView):
     serializer_class = LoginSerializer
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
+            username = serializer.validated_data['username']
             password = serializer.validated_data['password']
-            user = authenticate(request, username=email, password=password)
-            if user is None:
+            try:
+                user = CustomUser.objects.get(username=username)
+            except CustomUser.DoesNotExist:
                 return Response({"message": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-            if not user.is_verified:
-                return Response({"message": "Please verify your email first"}, status=status.HTTP_403_FORBIDDEN)
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'access': str(refresh.access_token),
-                'refresh': str(refresh)
-            })
+            if not user.check_password(password):
+                return Response({"message": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            otp = ''.join(random.choices(string.digits, k=6))
+            user.otp = otp
+            user.otp_expiry = timezone.now() + timedelta(minutes=5)
+            user.save()
+            send_otp_email(user, otp)
+            return Response({"message": "OTP sent to your email"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @extend_schema(
@@ -116,23 +123,42 @@ class ChangePasswordView(APIView):
             request.user.save()
             return Response({"message": "password changed"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)       
-@extend_schema(tags=["Profile"],request=ProfileSerializer)
+@extend_schema(tags=["Profile"],request=UserProfileSerializer, responses={200: UserProfileSerializer})
 class ProfileView(APIView):
-    serializer_class = ProfileSerializer
+    serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
     def get(self, request):
         profile = Profile.objects.get(user = request.user)
-        serializer = ProfileSerializer(profile, context={'request': request})
+        serializer = UserProfileSerializer(profile, context={'request': request})
         return Response(serializer.data,status=status.HTTP_200_OK)
     def patch(self, request):
         profile = Profile.objects.get(user=request.user)
-        serializer = ProfileSerializer(profile, data=request.data, partial=True, context={'request': request})
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @extend_schema(tags=["Authentication"])  
+class LoginOTPVerifyView(APIView):
+    def post(self, request):
+        serializer = LoginOTPVerifySerializer(data=request.data)
+        if serializer.is_valid():
+            username = serializer.validated_data['username']
+            otp = serializer.validated_data['otp']
+            user = get_object_or_404(CustomUser, username=username)
+            if timezone.now() < user.otp_expiry and user.otp == otp:
+                refresh = RefreshToken.for_user(user)
+                user.otp = None
+                user.otp_expiry = None
+                user.save()
+                return Response({
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                })
+            return Response({"message": "Invalid or expired OTP"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class LogOutView(APIView):
     serializer_class = None
     permission_classes = [IsAuthenticated]

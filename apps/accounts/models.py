@@ -17,12 +17,16 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
+    username = models.CharField(max_length=150, unique=True)
     name =  models.CharField(max_length=255)
     is_verified = models.BooleanField(default=False)
     verification_token = models.UUIDField(default=uuid.uuid4)
     password_reset_token = models.UUIDField(null=True, blank=True)
     password_reset_expiry = models.DateTimeField(null=True,blank=True)
+    otp = models.CharField(max_length=6, null=True, blank=True)
+    otp_expiry = models.DateTimeField(null=True, blank=True)
     objects = CustomUserManager()
+
     is_superuser = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
