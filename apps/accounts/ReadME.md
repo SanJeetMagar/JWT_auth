@@ -1,2 +1,1 @@
-This project is full authencation using JWT token
-hello
+Jwt auth documentation from scratch 
