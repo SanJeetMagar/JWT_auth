@@ -989,4 +989,5 @@ Click any endpoint → "Try it out" → fill fields → Execute!
 
 ---
 
-*Built from scratch, understood line by line. — Sanjeet Magar*
+*Built from scratch, understood line by line. — Sanjeet Magar*'
+---WILL ADD TESTING INSTRUCTIONS AND POSTMAN COLLECTION LATER---    
